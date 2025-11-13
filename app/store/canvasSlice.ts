@@ -117,10 +117,26 @@ const canvasSlice = createSlice({
               width: child.size.width * scaleX,
               height: child.size.height * scaleY,
             };
+
+            // Scale font size for text elements
+            if (child.type === 'text') {
+              const textChild = child as TextElement;
+              textChild.fontSize = Math.max(8, Math.round(textChild.fontSize * scaleY));
+            }
           }
         });
       } else {
+        // Calculate scale factor for individual element resize
+        const scaleY = size.height / element.size.height;
+
+        // Update element size
         element.size = size;
+
+        // Scale font size for text elements
+        if (element.type === 'text') {
+          const textElement = element as TextElement;
+          textElement.fontSize = Math.max(8, Math.round(textElement.fontSize * scaleY));
+        }
       }
     },
 
