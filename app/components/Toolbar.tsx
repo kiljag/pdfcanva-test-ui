@@ -1,21 +1,33 @@
 'use client';
 
 import React from 'react';
-import { useCanvas } from '../context/CanvasContext';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { selectToolbarState, selectSelectedIds } from '../store/selectors';
+import { addTextElement, addTableElement, groupElements, ungroupElement, deleteSelected } from '../store/canvasSlice';
 
 export default function Toolbar() {
-  const { state, addTextElement, addTableElement, groupSelectedElements, ungroupElement, deleteSelected } = useCanvas();
+  const dispatch = useAppDispatch();
+  const { canGroup, canUngroup, hasSelection } = useAppSelector(selectToolbarState);
+  const selectedIds = useAppSelector(selectSelectedIds);
 
-  const canGroup = state.selectedIds.length >= 2;
-  const canUngroup = state.selectedIds.length === 1 &&
-    state.elements.find(el => el.id === state.selectedIds[0])?.type === 'group';
+  const handleGroup = () => {
+    if (canGroup) {
+      dispatch(groupElements(selectedIds));
+    }
+  };
+
+  const handleUngroup = () => {
+    if (canUngroup && selectedIds.length === 1) {
+      dispatch(ungroupElement(selectedIds[0]));
+    }
+  };
 
   return (
     <div className="flex items-center gap-2 p-4 bg-white border-b border-gray-200 shadow-sm">
       {/* Add Elements Section */}
       <div className="flex gap-2 pr-4 border-r border-gray-300">
         <button
-          onClick={addTextElement}
+          onClick={() => dispatch(addTextElement())}
           className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm"
           title="Add Text Element (Double-click to edit)"
         >
@@ -25,7 +37,7 @@ export default function Toolbar() {
           Add Text
         </button>
         <button
-          onClick={addTableElement}
+          onClick={() => dispatch(addTableElement())}
           className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors shadow-sm"
           title="Add Table Element (Double-click cells to edit)"
         >
@@ -39,7 +51,7 @@ export default function Toolbar() {
       {/* Group/Ungroup Section */}
       <div className="flex gap-2 pr-4 border-r border-gray-300">
         <button
-          onClick={groupSelectedElements}
+          onClick={handleGroup}
           disabled={!canGroup}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors shadow-sm ${
             canGroup
@@ -54,7 +66,7 @@ export default function Toolbar() {
           Group
         </button>
         <button
-          onClick={() => canUngroup && ungroupElement(state.selectedIds[0])}
+          onClick={handleUngroup}
           disabled={!canUngroup}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors shadow-sm ${
             canUngroup
@@ -73,10 +85,10 @@ export default function Toolbar() {
       {/* Delete Section */}
       <div className="flex gap-2">
         <button
-          onClick={deleteSelected}
-          disabled={state.selectedIds.length === 0}
+          onClick={() => dispatch(deleteSelected())}
+          disabled={!hasSelection}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors shadow-sm ${
-            state.selectedIds.length > 0
+            hasSelection
               ? 'bg-red-500 text-white hover:bg-red-600'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}

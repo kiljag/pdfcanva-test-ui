@@ -1,15 +1,16 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { useCanvas } from '../context/CanvasContext';
+import React, { useState, useRef, useEffect, memo } from 'react';
+import { useAppDispatch } from '../store/hooks';
+import { updateTableCell } from '../store/canvasSlice';
 import type { TableElement as TableElementType } from '../types/canvas';
 
 interface Props {
   element: TableElementType;
 }
 
-export default function TableElement({ element }: Props) {
-  const { dispatch } = useCanvas();
+function TableElement({ element }: Props) {
+  const dispatch = useAppDispatch();
   const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
   const [editValue, setEditValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -29,13 +30,12 @@ export default function TableElement({ element }: Props) {
 
   const handleBlur = () => {
     if (editingCell) {
-      dispatch({
-        type: 'UPDATE_TABLE_CELL',
+      dispatch(updateTableCell({
         id: element.id,
         row: editingCell.row,
         col: editingCell.col,
         content: editValue,
-      });
+      }));
       setEditingCell(null);
     }
   };
@@ -100,3 +100,6 @@ export default function TableElement({ element }: Props) {
     </div>
   );
 }
+
+// Memoize to prevent unnecessary re-renders
+export default memo(TableElement);

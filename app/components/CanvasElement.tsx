@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { useCanvas } from '../context/CanvasContext';
+import React, { useState, useRef, useEffect, memo, useMemo } from 'react';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { selectIsElementSelected, selectGroupChildren, selectZoom, selectElements } from '../store/selectors';
+import { selectElement, moveElement, resizeElement } from '../store/canvasSlice';
 import type { CanvasElement as CanvasElementType, ResizeHandle } from '../types/canvas';
 import TextElement from './TextElement';
 import TableElement from './TableElement';
@@ -10,8 +12,14 @@ interface Props {
   element: CanvasElementType;
 }
 
-export default function CanvasElement({ element }: Props) {
-  const { state, dispatch } = useCanvas();
+function CanvasElement({ element }: Props) {
+  const dispatch = useAppDispatch();
+  const isSelected = useAppSelector((state) => selectIsElementSelected(element.id)(state));
+  const zoom = useAppSelector(selectZoom);
+  const groupChildren = useAppSelector((state) =>
+    element.type === 'group' ? selectGroupChildren(element.id)(state) : []
+  );
+
   const elementRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -26,8 +34,6 @@ export default function CanvasElement({ element }: Props) {
     elementY: 0
   });
 
-  const isSelected = state.selectedIds.includes(element.id);
-
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).classList.contains('resize-handle')) {
       return; // Let resize handle do its job
@@ -37,9 +43,9 @@ export default function CanvasElement({ element }: Props) {
 
     // Multi-select with Ctrl/Cmd key
     if (e.ctrlKey || e.metaKey) {
-      dispatch({ type: 'SELECT_ELEMENT', id: element.id, multiSelect: true });
+      dispatch(selectElement({ id: element.id, multiSelect: true }));
     } else if (!isSelected) {
-      dispatch({ type: 'SELECT_ELEMENT', id: element.id });
+      dispatch(selectElement({ id: element.id }));
     }
 
     // Start dragging
@@ -70,18 +76,18 @@ export default function CanvasElement({ element }: Props) {
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) {
-        const deltaX = (e.clientX - dragStart.current.x) / state.zoom;
-        const deltaY = (e.clientY - dragStart.current.y) / state.zoom;
+        const deltaX = (e.clientX - dragStart.current.x) / zoom;
+        const deltaY = (e.clientY - dragStart.current.y) / zoom;
 
         const newPosition = {
           x: dragStart.current.elementX + deltaX,
           y: dragStart.current.elementY + deltaY,
         };
 
-        dispatch({ type: 'MOVE_ELEMENT', id: element.id, position: newPosition });
+        dispatch(moveElement({ id: element.id, position: newPosition }));
       } else if (isResizing && resizeHandle) {
-        const deltaX = (e.clientX - resizeStart.current.x) / state.zoom;
-        const deltaY = (e.clientY - resizeStart.current.y) / state.zoom;
+        const deltaX = (e.clientX - resizeStart.current.x) / zoom;
+        const deltaY = (e.clientY - resizeStart.current.y) / zoom;
 
         let newWidth = resizeStart.current.width;
         let newHeight = resizeStart.current.height;
@@ -114,18 +120,10 @@ export default function CanvasElement({ element }: Props) {
 
         // Update position if needed (for nw, ne, sw handles)
         if (newX !== resizeStart.current.elementX || newY !== resizeStart.current.elementY) {
-          dispatch({
-            type: 'MOVE_ELEMENT',
-            id: element.id,
-            position: { x: newX, y: newY }
-          });
+          dispatch(moveElement({ id: element.id, position: { x: newX, y: newY } }));
         }
 
-        dispatch({
-          type: 'RESIZE_ELEMENT',
-          id: element.id,
-          size: { width: newWidth, height: newHeight }
-        });
+        dispatch(resizeElement({ id: element.id, size: { width: newWidth, height: newHeight } }));
       }
     };
 
@@ -144,22 +142,18 @@ export default function CanvasElement({ element }: Props) {
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, isResizing, resizeHandle, element.id, state.zoom, dispatch]);
+  }, [isDragging, isResizing, resizeHandle, element.id, zoom, dispatch, element.position.x, element.position.y]);
 
-  const renderContent = () => {
+  const renderContent = useMemo(() => {
     if (element.type === 'text') {
       return <TextElement element={element} />;
     } else if (element.type === 'table') {
       return <TableElement element={element} />;
     } else if (element.type === 'group') {
       // Render group children
-      const children = state.elements.filter((el) =>
-        element.children.includes(el.id)
-      );
-
       return (
         <div className="w-full h-full relative">
-          {children.map((child) => (
+          {groupChildren.map((child) => (
             <div
               key={child.id}
               style={{
@@ -184,7 +178,7 @@ export default function CanvasElement({ element }: Props) {
       );
     }
     return null;
-  };
+  }, [element, groupChildren]);
 
   return (
     <div
@@ -206,7 +200,7 @@ export default function CanvasElement({ element }: Props) {
 
       {/* Content */}
       <div className="w-full h-full">
-        {renderContent()}
+        {renderContent}
       </div>
 
       {/* Resize handles (only show for selected elements) */}
@@ -238,3 +232,9 @@ export default function CanvasElement({ element }: Props) {
     </div>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders
+export default memo(CanvasElement, (prevProps, nextProps) => {
+  // Only re-render if the element reference changed
+  return prevProps.element === nextProps.element;
+});

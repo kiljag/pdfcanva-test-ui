@@ -1,15 +1,16 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { useCanvas } from '../context/CanvasContext';
+import React, { useState, useRef, useEffect, memo } from 'react';
+import { useAppDispatch } from '../store/hooks';
+import { updateTextContent } from '../store/canvasSlice';
 import type { TextElement as TextElementType } from '../types/canvas';
 
 interface Props {
   element: TextElementType;
 }
 
-export default function TextElement({ element }: Props) {
-  const { dispatch } = useCanvas();
+function TextElement({ element }: Props) {
+  const dispatch = useAppDispatch();
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(element.content);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -29,7 +30,7 @@ export default function TextElement({ element }: Props) {
   const handleBlur = () => {
     setIsEditing(false);
     if (editValue !== element.content) {
-      dispatch({ type: 'UPDATE_TEXT_CONTENT', id: element.id, content: editValue });
+      dispatch(updateTextContent({ id: element.id, content: editValue }));
     }
   };
 
@@ -88,3 +89,6 @@ export default function TextElement({ element }: Props) {
     </div>
   );
 }
+
+// Memoize to prevent unnecessary re-renders
+export default memo(TextElement);
